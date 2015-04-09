@@ -1,17 +1,3 @@
-This is a diploma thesis template for students studying 
-at the faculty of Mathematics and Mechanics, 
-State University of Saint-Petersburg
-
-Это шаблон дипломной или курсовой работы для студентов 
-математико-механического факультета 
-Санкт-Петербургского Государственного университета.
-
-Шаблон включает титульный лист на двух языках, 
-пример верстки глав, иллюстраций и списка литературы.
-
-Мы стараемся поддерживать шаблон в актуальном состоянии.
-Если вы обнаружите какую-либо неточность или несоответствие 
-нынешним требованиям факультета, пожалуйста, сообщите нам
-об этом по электронной почте contact@papeeria.com
-
-
+My bachelor thesis at ITMO University
+Created with Papeeria - Online LaTeX editor
+Template credit - Papeeria
