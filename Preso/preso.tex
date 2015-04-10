@@ -1,0 +1,139 @@
+%% Простая презентация с примером включения программного кода и
+%% пошаговых спецэффектов
+\documentclass{beamer}
+\usepackage{fontspec}
+\usepackage{xunicode}
+\usepackage{xltxtra}
+\usepackage{xecyr}
+\usepackage{hyperref}
+\setmainfont[Mapping=tex-text]{DejaVu Serif}
+\setsansfont[Mapping=tex-text]{DejaVu Sans}
+\setmonofont[Mapping=tex-text]{DejaVu Sans Mono}
+\usepackage{polyglossia}
+\setdefaultlanguage{russian}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{amssymb}% http://ctan.org/pkg/amssymb
+\usepackage{pifont}
+\usetheme{CambridgeUS}
+
+\lstdefinestyle{mycode}{
+  belowcaptionskip=1\baselineskip,
+  breaklines=true,
+  xleftmargin=\parindent,
+  showstringspaces=false,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{gray!40!black},
+  stringstyle=\color{red},
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{gray},
+}
+\lstset{escapechar=@,style=mycode}
+
+\begin{document}
+\title{Реализация эффективного выполнения поисковых запросов по множеству полей для колоночно-ориентированной базы данных, хранящейся в памяти.}
+\subtitle{предварительные результаты}
+\author{Жаворонков Эдгар Андреевич \\ группа 4501 \\ руководитель Дельгядо Ф.И}
+\institute{Университет ИТМО}
+
+\frame{\titlepage}
+
+\begin{frame}\frametitle{Актуальность разработки}
+    \begin{enumerate}
+        \item Создание Open Source in-memory NoSQL базы данных, позволяющей решать задачу быстрого многокритериального поиска
+        \item Существующие решения либо очень дороги, либо ориентированы больше в сторону аналитических приложений
+        \item <2-> Либо медленные, так как работают с диском
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Обзор предметной области}
+    \begin{enumerate}
+        \item Текущее состояние дел таково, что в большинстве приложений требующих многокритериальный поиск(интернет-магазины, библиотеки) используются традиционные SQL решения (MySQL, PostgreSQL etc.) 
+        \item Гиганты индустрии(Amazon.com, ebay.com) используют NoSQL-решения, но они, как правило, дороги.
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Аналоги}
+    \begin{tabular}{| l | c | c | c | c |}
+        \hline
+        Product & in-memory & NoSQL & OLAP & Price \\
+        \hline
+        Oracle TimesTen & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{red}{€19,969.00} \\
+        \hline 
+        VoltDB          & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{red}{\$3500/month} \\
+        \hline
+        SAP HANA        & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{green}{\checkmark} & \color{red}{\$3595/month}\\
+        \hline
+    \end{tabular}
+    \begin{enumerate}
+        \item Все три решения - очень мощные аналитические инструменты, использующие поколоночное хранение данных в оперативной памяти. 
+        \item Как видно, их основной недостаток - цена. Вендоры, кроме всего прочего, предоставляют сервера, на которых разворачиваются эти решения. 
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Цель и задачи ВКР}
+    Цель работы - разработать компонент, обеспечивающий быстрое выполнение поисковых запросов по нескольким полям для in-memory базы данных.
+    
+    Задачи:
+    \begin{enumerate}
+        \item Разобраться в существующей архитектуре
+        \item Попробовать различные подходы к выполнению поисковых запросов
+        \item Реализовать возможность обеспечения целостности данных на массовых загрузках документов
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Требования}
+    Функциональные требования:
+        \begin{enumerate}\itemsep0pt \parskip0pt \parsep0pt
+            \item Планирование порядка выполнения запроса
+            \item Учет сложности запросов к сложным хранилищам (полнотекстовый поиск и т.п.)
+            \item Возможность подстройки оптимизатора под конкретное железо
+            \item Эффективная реализация выполнения запросов на массированных изменениях данных
+        \end{enumerate}
+    Формальные показатели:
+        \begin{enumerate}\itemsep0pt \parskip0pt \parsep0pt 
+            \item Увеличение времени выполнения отдельных запросов в два и более раз
+        \end{enumerate}
+    Нефункциональные требования:
+        \begin{enumerate}\itemsep0pt \parskip0pt \parsep0pt 
+                \item Низкие накладные расходы на обеспечение эффективности выполнения запросов
+                \item Тестирование корректности выполнения запросов
+        \end{enumerate}
+\end{frame}
+
+%сюда бы слайд с диаграммой классов....
+
+\begin{frame}\frametitle{Текущие результаты}
+    \begin{enumerate}
+        \item Сбор статистики по каждому атрибуту
+        \item Примитивный интерфейс транзакций
+        \item Тесты производительности
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Использованные инструменты}
+    \begin{enumerate}
+        \item Java 8
+        \item Java EWAH
+        \item Apache Lucene
+        \item Git 
+        \item Travis CI
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}\frametitle{Планируемые доработки}
+    \begin{enumerate}
+        \item Довести до конца тестирование компонента 
+        \item Реализовать более производительный вариант транзакций
+    \end{enumerate}
+\end{frame}
+
+\begin{frame} 
+    \begin{center} 
+        \Huge Спасибо за внимание! \\ Вопросы? 
+    \end{center} 
+\end{frame} 
+
+\end{document}
