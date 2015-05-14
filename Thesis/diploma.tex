@@ -29,7 +29,7 @@
     %   bachelor - Диплом бакалавра
     type               = {bachelor},
     position           = {студента},
-    group              = 4501,
+    group              = {4501},
     author             = {Жаворонков Эдгар Андреевич},
     %supervisorPosition = {д.\,ф.-м.\,н., профессор},
     supervisor         = {Дельгядо Ф.\,И.},
@@ -118,7 +118,7 @@
                     \item Тестирование правильности функционирования выполнения запросов
             \end{enumerate}
     \subsection{Обзор аналогов}
-        Ближайшие по архитектуре СУБД - это TimesTen by Oracle, VoltDB, SAP HANA. Все три используют хранение данных по колонкам, являются in-memory и предназначены для аналитических задач. Однако, их объединяет один общий недостаток - цена. Полные версии всех трех СУБД стоят больше десяти тысяч USD.
+        Ближайшие по архитектуре СУБД - это TimesTen by Oracle, VoltDB, SAP HANA. Все три используют хранение данных по колонкам, являются in-memory и предназначены для аналитических задач. Однако, их объединяет один общий недостаток - цена. Полные версии всех трех СУБД стоят больше десяти тысяч долларов США.
     
     Существует бесплатный вариант in-memory SQL базы данных - H2. Однако, он не колоночно-ориентирован и медленно работает на сложных операциях JOIN.
     
@@ -293,7 +293,7 @@
         
         При инциализации движка базы данных происходит создание и запуск параллельного потока, который в бесконечном цикле вызывает операцию $callTuner$ один раз в секунду.
         
-        При исполнении поискового запроса перед проверкой на корректность происходит добавление запроса в очередь. Настройщик извлекает последний запрос, попавший в очередь и для кадого атрибута в запросе измеряет среднее время выполнения операции $findSet$  к хранилищу и среднее время проверки значения атрибута в документе напрямую. Результаты сохраняются в специальный журнал, доступный как и потоку, в котором работает настройщик, так и потоку, в котором работает исполнитель запросов.
+        При исполнении поискового запроса перед проверкой на корректность происходит добавление запроса в очередь. Настройщик извлекает последний запрос, попавший в очередь и для каждого атрибута в запросе измеряет среднее время выполнения операции $findSet$  к хранилищу и среднее время проверки значения атрибута в документе напрямую. Результаты сохраняются в специальный журнал, доступный как и потоку, в котором работает настройщик, так и потоку, в котором работает исполнитель запросов.
         
         Соответственно, алгоритм TunableExecutor принимает на вход поисковый запрос $Q$, разбивает его на части $\left\{ q_1, q_2, q_3, ... , q_n \right\} $ и ставит в соответствие каждому атрибуту из частей запроса среднее время выполнения операции $findSet$, если же по каким-либо причинам статистических данных нет, то в соответствие атрибуту ставится вес хранилища. После этого, он обращается к хранилищам в порядке увеличения среднего времени выполнения. 
         
@@ -301,7 +301,7 @@
         
         \begin{algorithm}[H]
         \caption{TunerThread}
-        \label{thread}
+        \label{tunerThread}
             \begin{algorithmic}
                 \WHILE {TRUE}
                     \STATE $callTuner();$
@@ -388,7 +388,7 @@
                 \STATE $a_1 \leftarrow Attribute(q_1)$
                 \STATE $a_2 \leftarrow Attribute(q_2)$
                 \IF {$ExecutionTime(journal, a_1) < ExecutionTime(journal, a_2)$}
-                    \RETURN $-1$
+                    \RETURN $-1;$
                 \ELSE 
                     \IF {$ExecutionTime(journal, a_1) = ExecutionTime(journal, a_2)$}
                         \RETURN $0;$
@@ -399,18 +399,176 @@
             \end{algorithmic}
         \end{algorithm}
         
-    \subsection{Описание первого варианта реализации атомарного добавления документа}
-    \subsection{Описание второго варианта реализации атомарного добавления документа}
+    \subsection{Описание первого варианта атомарного изменения документа}
+        \paragraph{Мотивация} В распределенных системах важным моментом является поддержка согласованности данных. В рамках данной работы, поддержка согласованности данных сводится к возможности атомарно изменять значения в документах. Существует целая теория, описывающая модели и подходы к обеспечению согласованности. В рамках данной теории вводится понятие транзакции и рассматриваются некоторые свойства, которыми должны обладать транзакции, чтобы обеспечить согласованность данных между ними. Транзакцией, называется совокупность операций, переводящая систему из одного согласованного состояния в другое при выполнении двух условий:
+        \begin{enumerate}
+            \item Нет помех со стороны других приложений
+            \item Последовательность операций выполнена полностью
+        \end{enumerate} - \cite{novikov}
+        
+        В данной работе приведено описание двух вариантов реализации атомарного изменения значения в документе. Первый вариант предполагает три операции.
+        \begin{enumerate}
+            \item $StartTransaction$ - начинает сеанс массового обновления значений и возвращает уникальный идентификатор сеанса 
+            \item $CommitTrasaction$ - Подтверждает все изменения и применяет их к записям в базе данных
+            \item $RollBackTransaction$ - Отменяет текущий сеанс и откатывает все изменения, возвращая базу в исходное состояние.
+        \end{enumerate}    
+        Рассмотрим более подробно, как происходят все три операции. Операция $StartTransaction$ не принимает ничего на вход, но, при этом, внутри себя генерирует уникальный идентификатор сеанса и создает запись в специальном журнале. Пользователю возвращается идентификатор сеанса. Псевдокод выглядит следующим образом:
+            
+        \begin{algorithm}[H]                   
+        \caption{StartTransaction}              
+        \label{startTran1}                        
+            \begin{algorithmic}        
+                \ENSURE $transactionID$ - уникальный идентификатор сеанса
+                \STATE $transactionID \leftarrow GenerateBigRandomNumber();$
+                \STATE $PutNewRecord(transactionID);$
+                \RETURN $transactionID;$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        Операция $CommitTransaction$ принимает на вход идентификатор сеанса, блокирует движок базы данных и применяет изменения, записанные в журнал. Псевдокод имеет следующий вид
+        
+        \begin{algorithm}[H]                   
+        \caption{CommitTransaction}              
+        \label{commitTran1}                        
+            \begin{algorithmic}
+                \REQUIRE $transactionID$ - уникальный идентификатор сеанса
+                \STATE $LockEngine();$
+                \STATE $ operations \leftarrow GetOperations(transactionID);$
+                \FOR {$operation \in operations$}
+                    \STATE $docID \leftarrow DocumentId(operation);$
+                    \STATE $attr \leftarrow Attribute(operation);$
+                    \STATE $val \leftarrow Value(opearion);$
+                    \STATE $SetValue(docID, attr, val);$
+                \ENDFOR
+                \STATE $UnlockEngine();$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        Процедуры $LockEngine$ и $UnlockEngine$ осуществляют блокировку движка базы данных, чтобы ни один параллельный поток не мог вмешать в процесс применения изменений. Функция $GetOperations$ принимает на вход идентификатор сеанса и возвращает список всех операций изменения значения в документах. Функции $DocumentId$, $Attribute$ и $Value$ принимают на вход операцию изменения и возвращают номер документа, атрибут и значение соответственно. Процедура $SetValue$ принимает на вход номер документа, атрибут и его новое значение и устанавливает в документе с соответствующим номером новое значение соответствующего атрибута.
+        
+        Отдельно написана процедура $SetValue'$, предназначенная для использования при массовой загрузке документов. Кроме номера документа, атрибута и значения, она принимает на вход еще и номер сеанса массовой загрузки, в рамках которого должны быть приняты соответствующие изменения. Её псевдокод выглядит следующим образом:
+        
+        \begin{algorithm}[H]                   
+        \caption{SetValue'}              
+        \label{update}                        
+            \begin{algorithmic}
+                \REQUIRE $transactionID$ - уникальный идентификатор сеанса, $docID$ - номер документа, $attribute$ - атрибут, $value$ - новое значение атрибута
+                \STATE $ AddOperation(transactionID, docID, attribute, value);$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        Процедура $AddOperation$ принимает на вход идентификатор сеанса, номер документа, атрибут и его новое значение и добавляет в журнал запись об очередном изменении в рамках данного сеанса.  
+    \subsection{Описание второго варианта атомарного добавления документа}
+        Второй вариант предполагает те же три операции, однако несколько иную логику их выполнения. В данном варианте после начала сеанса массового обновления значений в документах изменения записываются в журнал текущих изменений, но не применяются к документам. Затем по подтверждению, эти изменения записываются в журнал добавленных изменений. 
+        
+        При этом процесс выполнения поискового запроса несколько модифицируется. Очевидно, что при отсутствии какой-либо синхронизации, поисковые запросы будут выдавать неконсистентные данные. Для предотвращения этого, перед возвратом результирующей выдачи поискового запроса движок базы данных проверяет, нет ли среди добавленных изменений тех, которые могут повлиять на результирующую выдачу. Если такие изменения есть, то результирующая выборка модифицируется(из нее либо удаляются более неактуальные документы, либо добавляются новые). Параллельно этой проверке, добавленные изменения применяются к документам в базе данных.
+        
+        Операция отката в данном случае просто очищает список текущих изменений. Псевдокод операций имеет следующий вид:
+        
+        \begin{algorithm}[H]                   
+        \caption{StartTransaction}              
+        \label{startTran12}                        
+            \begin{algorithmic}        
+                \ENSURE $transactionID$ - уникальный идентификатор сеанса
+                \STATE $transactionID \leftarrow GenerateBigRandomNumber();$
+                \STATE $PutNewRecord(transactionID);$
+                \RETURN $transactionID;$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        \begin{algorithm}[H]                   
+        \caption{CommitTransaction}              
+        \label{commitTran2}                        
+            \begin{algorithmic}
+                \REQUIRE $transactionID$ - уникальный идентификатор сеанса
+                \FOR {$operation \in currentChanges$}
+                    \STATE $AddOperation(operation);$
+                \ENDFOR
+            \end{algorithmic}
+        \end{algorithm}
+        
+        Б\'{о}льший интерес представляет процедура исполнения запроса. Приведём её псевдокод
+        
+        \begin{algorithm}[H]
+        \caption{ExecuteQuery}
+        \label{exec1}
+            \begin{algorithmic}
+                \REQUIRE $Q$ - поисковый запрос
+                \ENSURE $resultSet$ - множество документов, удовлетворяющих запросу $Q$
+                \STATE $push(Q, queries);$
+                \STATE $CheckQuery(Q);$
+                \STATE $resultSet \leftarrow TunableExecutor(Q);$
+                \STATE $RunThread(ApplyChangesThread);$
+                \FOR {$operation \in addedChanges$}
+                    \STATE $docID \leftarrow DocumentId(operation);$
+                    \STATE $attr \leftarrow Attribute(operation);$
+                    \STATE $val \leftarrow Value(opearion);$
+                    
+                    \IF {$(attr, val) \in Q$}
+                        \IF {$docID \notin resultSet$}
+                            \STATE $Add(resultSet, docID);$
+                        \ENDIF
+                        
+                    \ENDIF
+                    
+                    \IF {$attr \in Attributes(Q) \land val \neq GetValue(Q, attr) $}
+                        \IF {$docID \in resultSet$}
+                            \STATE $Remove(resultSet, docID);$
+                        \ENDIF
+                    \ENDIF
+                \ENDFOR
+                \STATE $JoinThread(ApplyChangesThread);$
+                \STATE $Clear(addedChanges);$
+                \RETURN $resultSet;$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        Операции $Add$ и $Remove$ добавляют и, соответственно, удаляют из результирующей выборки документ по его номеру. Функция $Attributes$ принимает на вход поисковый запрос и возвращает множество всех атрибутов, имеющихся в запросе. Функция $GetValue$ принимает на вход запрос и атрибут и возвращает значение атрибута. Операция $Clear$ очищает журнал с добавленными изменениями. Процедуры $StartThread$ и $JoinThread$ запускают параллельный поток и, соответственно, дожидаются результатов его выполнения. Псевдокод функции $ApplyChangesThread$ приведен далее:
+        
+        \begin{algorithm}[H]
+        \caption{ApplyChangesThread}
+        \label{tranThread}
+            \begin{algorithmic}
+                \IF {$addedChanges \neq \emptyset$}
+                    \FOR {$operation \in addedChanges$}
+                        \STATE $docID \leftarrow DocumentId(operation);$
+                        \STATE $attr \leftarrow Attribute(operation);$
+                        \STATE $val \leftarrow Value(opearion);$
+                        \STATE $SetValue(docID, attr, val);$
+                    \ENDFOR
+                \ENDIF
+            \end{algorithmic}
+        \end{algorithm}
+        
+        В рамках данного подхода к массовым изменениям значений в документах, псевдокод процедуры $SetValue'$ имеет следующий вид:
+        
+        \begin{algorithm}[H]                   
+        \caption{SetValue'}              
+        \label{update}                        
+            \begin{algorithmic}
+                \REQUIRE $transactionID$ - уникальный идентификатор сеанса, $docID$ - номер документа, $attribute$ - атрибут, $value$ - новое значение атрибута
+                \STATE $operation \leftarrow (docID, attribute, value);$
+                \STATE $Add(currentChanges, operation);$
+                \STATE $AddOperation(transactionID, operation);$
+            \end{algorithmic}
+        \end{algorithm}
+        
+        
     \subsection{Описание тестовой инфраструктуры}
     
 \section{Особенности реализации}
     \subsection{Описание технологической платформы}
-    \subsection{Пример реализации SmartExecutor}
+    \subsection{Пример реализации алгоритма SmartExecutor}
     \subsection{Реализация тестовой инфраструктуры}
     \subsection{Результаты тестирования}
     
 \section*{Заключение}
 
-\bibliographystyle{gost780s}
+\bibliographystyle{ugost2008s}
 \bibliography{diploma.bib}
+\section*{Приложение А. Диаграмма классов системы Vindur}
+\section*{Приложение Б. Блок-схема алгоритма DumbExecutor}
+\section*{Приложение В. Блок-схема алгоритма SmartExecutor}
+\section*{Приложение Г. Блок-схема алгоритма TunableExecutor}
+
 \end{document}
